@@ -14,6 +14,7 @@ class User(db.Model):
     password = db.Column(db.String, nullable=False)
     date_created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     posts = db.relationship('Post', backref='author')
+    comments = db.relationship('Comment', backref='user')
     token = db.Column(db.String(32), index=True, unique=True)
     token_expiration = db.Column(db.DateTime)
 
@@ -80,6 +81,8 @@ class Post(db.Model):
     body = db.Column(db.String, nullable=False)
     date_created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    # author = db.relationship('User',back_populates='posts')
+    comments = db.relationship('Comment', backref='post')
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -95,19 +98,19 @@ class Post(db.Model):
     def update(self, **kwargs):
         allowed_fields = {'title', 'body'}
 
-        def camel_to_snake(camel_string):
-            return re.sub('([A-Z][A-Za-z]*)', '_\1', camel_string).lower()
+        # def camel_to_snake(camel_string):
+        #     return re.sub('([A-Z][A-Za-z]*)', '_\1', camel_string).lower()
 
         for key, value in kwargs.items():
-            snake_key = camel_to_snake(key)
-            if snake_key in allowed_fields:
-                setattr(self, snake_key, value)
+            # snake_key = camel_to_snake(key)
+            if key in allowed_fields:
+                setattr(self, key, value)
 
         self.save()
 
     def delete(self):
-        db.session.delete(self)
-        db.session.commit()
+        db.session.delete(self) # deleting THIS object from the database
+        db.session.commit() # commiting our changes
 
     def to_dict(self):
         return {
@@ -118,6 +121,43 @@ class Post(db.Model):
             'userId': self.user_id,
             'author': self.author.to_dict(),
             'comments': [comment.to_dict() for comment in self.comments]
+        }
+    
+    
+# Create our Comment class/table
+class Comment(db.Model):
+    # CREATE TABLE
+    id = db.Column(db.Integer, primary_key=True)
+    body = db.Column(db.String, nullable=False)
+    date_created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
+    # user = db.relationship('User',back_populates='comments')
+    
+    
+    # INSERT INTO
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.save()
+        
+    def __repr__(self):
+        return f"<Comment {self.id}>"
+    
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+        
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+        
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'body': self.body,
+            'dateCreated': self.date_created,
+            'post_id': self.post_id,
+            'user': self.user.to_dict()
         }
 
 
